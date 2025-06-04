@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browser Cowork - Virtual Workspace</title>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #2b6cb0;
+    }
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    @media (min-width: 768px) {
+      .app-container {
+        flex-direction: row;
+      }
+    }
+    .sidebar {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      min-width: 300px;
+    }
+    .main-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 15px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    video {
+      width: 100%;
+      border-radius: 8px;
+      background: #e2e8f0;
+      aspect-ratio: 16/9;
+    }
+    .chat-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      height: 300px;
+    }
+    .chat-messages {
+      flex-grow: 1;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .chat-input {
+      display: flex;
+      gap: 10px;
+    }
+    input, select, button {
+      padding: 10px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #4299e1;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3182ce;
+    }
+    .user-card {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      background: #ebf8ff;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #bee3f8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      color: #2b6cb0;
+      font-weight: bold;
+    }
+    .timer-display {
+      font-size: 24px;
+      text-align: center;
+      margin: 10px 0;
+      font-family: monospace;
+    }
+    .timer-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .timer-btn {
+      flex: 1;
+      padding: 8px;
+    }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+    }
+    .hidden {
+      display: none;
+    }
+    .productivity-chart {
+      height: 200px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Browser Cowork</h1>
+      <p>A serverless virtual coworking space</p>
+    </header>
+
+    <!-- Lobby Screen -->
+    <div id="lobby" class="app-container">
+      <div style="max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1)">
+        <h2 style="margin-top: 0">Get Started</h2>
+        
+        <div style="margin-bottom: 20px">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold">Your Name</label>
+          <input type="text" id="userName" style="width: 100%; padding: 10px" placeholder="Enter your name">
+        </div>
+        
+        <div style="margin-bottom: 20px">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold">Today's Focus Goal</label>
+          <input type="text" id="focusGoal" style="width: 100%; padding: 10px" placeholder="What are you working on?">
+        </div>
+        
+        <div style="margin-bottom: 30px">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold">Your Skills (comma separated)</label>
+          <input type="text" id="userSkills" style="width: 100%; padding: 10px" placeholder="e.g. design, coding, writing">
+        </div>
+        
+        <div style="display: flex; gap: 10px">
+          <button id="createRoomBtn" style="flex: 1; padding: 12px">Create New Room</button>
+          <button id="joinRoomBtn" style="flex: 1; padding: 12px">Join Existing Room</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Room Screen -->
+    <div id="room" class="app-container hidden">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div id="userInfo" style="display: flex; align-items: center; margin-bottom: 20px">
+          <div class="avatar" id="userAvatar">Y</div>
+          <div>
+            <div style="font-weight: bold" id="displayUserName">You</div>
+            <div style="font-size: 12px; color: #718096">Room: <span id="displayRoomId"></span></div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 20px">
+          <div style="font-weight: bold; margin-bottom: 10px">Focus Goal</div>
+          <div id="displayFocusGoal" style="padding: 10px; background: #ebf8ff; border-radius: 4px">Not specified</div>
+        </div>
+        
+        <div style="margin-bottom: 20px">
+          <div style="font-weight: bold; margin-bottom: 10px">Participants (<span id="participantCount">1</span>)</div>
+          <div id="participantsList">
+            <div class="user-card">
+              <div class="avatar">Y</div>
+              <div>You</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 20px">
+          <div style="font-weight: bold; margin-bottom: 10px">Focus Timer</div>
+          <div class="timer-display" id="timerDisplay">25:00</div>
+          <div class="timer-controls">
+            <button class="timer-btn" data-minutes="25">25m</button>
+            <button class="timer-btn" data-minutes="50">50m</button>
+            <button class="timer-btn" data-minutes="15">15m</button>
+          </div>
+          <button id="timerToggle" style="width: 100%">Start Timer</button>
+        </div>
+        
+        <div style="margin-bottom: 20px">
+          <div style="font-weight: bold; margin-bottom: 10px">Ambient Sound</div>
+          <select id="ambientSound" style="width: 100%">
+            <option value="">None</option>
+            <option value="cafe">Coffee Shop</option>
+            <option value="rain">Rain</option>
+            <option value="fireplace">Fireplace</option>
+          </select>
+        </div>
+        
+        <div style="margin-bottom: 20px">
+          <div style="font-weight: bold; margin-bottom: 10px">Productivity</div>
+          <canvas class="productivity-chart" id="productivityChart"></canvas>
+        </div>
+        
+        <button id="leaveRoomBtn" style="width: 100%; background-color: #e53e3e">Leave Room</button>
+      </div>
+      
+      <!-- Main Content -->
+      <div class="main-content">
+        <div class="video-grid" id="videoGrid">
+          <video id="userVideo" muted autoplay playsinline></video>
+        </div>
+        
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input">
+            <input type="text" id="chatInput" placeholder="Type a message..." style="flex-grow: 1">
+            <button id="sendMessageBtn">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join Room Modal -->
+    <div id="joinModal" class="modal hidden">
+      <div class="modal-content">
+        <h2 style="margin-top: 0">Join Room</h2>
+        <p>Enter the room ID shared with you:</p>
+        <input type="text" id="roomIdInput" style="width: 100%; margin-bottom: 20px" placeholder="e.g. room-abc123">
+        <div style="display: flex; gap: 10px">
+          <button id="cancelJoinBtn" style="flex: 1; background: #e53e3e">Cancel</button>
+          <button id="confirmJoinBtn" style="flex: 1">Join</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <audio id="ambientAudio" loop></audio>
+
+  <script>
+    // App State
+    const state = {
+      user: {
+        id: localStorage.getItem('peerId') || `user-${Math.random().toString(36).substr(2, 9)}`,
+        name: localStorage.getItem('userName') || '',
+        focusGoal: localStorage.getItem('focusGoal') || '',
+        skills: localStorage.getItem('skills') ? localStorage.getItem('skills').split(',') : []
+      },
+      roomId: '',
+      peers: [],
+      messages: [],
+      timer: {
+        timeLeft: 1500, // 25 minutes in seconds
+        isRunning: false,
+        interval: null
+      },
+      ambientSound: '',
+      productivityData: {
+        focusedTime: 0,
+        distractedTime: 0,
+        sessions: []
+      }
+    };
+
+    // DOM Elements
+    const elements = {
+      lobby: document.getElementById('lobby'),
+      room: document.getElementById('room'),
+      joinModal: document.getElementById('joinModal'),
+      
+      // Lobby
+      userName: document.getElementById('userName'),
+      focusGoal: document.getElementById('focusGoal'),
+      userSkills: document.getElementById('userSkills'),
+      createRoomBtn: document.getElementById('createRoomBtn'),
+      joinRoomBtn: document.getElementById('joinRoomBtn'),
+      
+      // Room
+      userVideo: document.getElementById('userVideo'),
+      videoGrid: document.getElementById('videoGrid'),
+      displayUserName: document.getElementById('displayUserName'),
+      displayRoomId: document.getElementById('displayRoomId'),
+      displayFocusGoal: document.getElementById('displayFocusGoal'),
+      userAvatar: document.getElementById('userAvatar'),
+      participantsList: document.getElementById('participantsList'),
+      participantCount: document.getElementById('participantCount'),
+      timerDisplay: document.getElementById('timerDisplay'),
+      timerToggle: document.getElementById('timerToggle'),
+      chatMessages: document.getElementById('chatMessages'),
+      chatInput: document.getElementById('chatInput'),
+      sendMessageBtn: document.getElementById('sendMessageBtn'),
+      ambientSound: document.getElementById('ambientSound'),
+      ambientAudio: document.getElementById('ambientAudio'),
+      leaveRoomBtn: document.getElementById('leaveRoomBtn'),
+      productivityChart: document.getElementById('productivityChart'),
+      
+      // Join Modal
+      roomIdInput: document.getElementById('roomIdInput'),
+      cancelJoinBtn: document.getElementById('cancelJoinBtn'),
+      confirmJoinBtn: document.getElementById('confirmJoinBtn')
+    };
+
+    // PeerJS instance
+    let peer = null;
+    let connections = [];
+
+    // Initialize the app
+    function init() {
+      loadUserData();
+      setupEventListeners();
+      
+      // Initialize productivity chart
+      initProductivityChart();
+    }
+
+    function loadUserData() {
+      if (localStorage.getItem('userName')) {
+        elements.userName.value = localStorage.getItem('userName');
+      }
+      if (localStorage.getItem('focusGoal')) {
+        elements.focusGoal.value = localStorage.getItem('focusGoal');
+      }
+      if (localStorage.getItem('skills')) {
+        elements.userSkills.value = localStorage.getItem('skills');
+      }
+    }
+
+    function setupEventListeners() {
+      // Lobby
+      elements.createRoomBtn.addEventListener('click', createRoom);
+      elements.joinRoomBtn.addEventListener('click', showJoinModal);
+      
+      // Room
+      elements.timerToggle.addEventListener('click', toggleTimer);
+      elements.sendMessageBtn.addEventListener('click', sendMessage);
+      elements.chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+      });
+      elements.ambientSound.addEventListener('change', changeAmbientSound);
+      elements.leaveRoomBtn.addEventListener('click', leaveRoom);
+      
+      // Timer buttons
+      document.querySelectorAll('.timer-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const minutes = parseInt(btn.dataset.minutes);
+          setTimer(minutes * 60);
+        });
+      });
+      
+      // Join Modal
+      elements.cancelJoinBtn.addEventListener('click', hideJoinModal);
+      elements.confirmJoinBtn.addEventListener('click', joinRoom);
+    }
+
+    function createRoom() {
+      // Save user data
+      state.user.name = elements.userName.value.trim() || 'Anonymous';
+      state.user.focusGoal = elements.focusGoal.value.trim();
+      state.user.skills = elements.userSkills.value.split(',').map(s => s.trim());
+      
+      localStorage.setItem('userName', state.user.name);
+      localStorage.setItem('focusGoal', state.user.focusGoal);
+      localStorage.setItem('skills', state.user.skills.join(','));
+      localStorage.setItem('peerId', state.user.id);
+      
+      // Create room ID
+      state.roomId = `room-${Math.random().toString(36).substr(2, 6)}`;
+      
+      // Initialize PeerJS
+      initializePeer();
+      
+      // Update UI
+      updateUserDisplay();
+      elements.lobby.classList.add('hidden');
+      elements.room.classList.remove('hidden');
+      window.history.pushState({}, '', `?room=${state.roomId}`);
+      
+      // Get user media
+      getUserMedia();
+    }
+
+    function showJoinModal() {
+      elements.joinModal.classList.remove('hidden');
+    }
+
+    function hideJoinModal() {
+      elements.joinModal.classList.add('hidden');
+    }
+
+    function joinRoom() {
+      const roomId = elements.roomIdInput.value.trim();
+      if (!roomId) return;
+      
+      // Save user data
+      state.user.name = elements.userName.value.trim() || 'Anonymous';
+      state.user.focusGoal = elements.focusGoal.value.trim();
+      state.user.skills = elements.userSkills.value.split(',').map(s => s.trim());
+      
+      localStorage.setItem('userName', state.user.name);
+      localStorage.setItem('focusGoal', state.user.focusGoal);
+      localStorage.setItem('skills', state.user.skills.join(','));
+      localStorage.setItem('peerId', state.user.id);
+      
+      state.roomId = roomId;
+      
+      // Initialize PeerJS
+      initializePeer();
+      
+      // Update UI
+      updateUserDisplay();
+      elements.lobby.classList.add('hidden');
+      elements.room.classList.remove('hidden');
+      elements.joinModal.classList.add('hidden');
+      window.history.pushState({}, '', `?room=${state.roomId}`);
+      
+      // Get user media
+      getUserMedia();
+    }
+
+    function initializePeer() {
+      peer = new Peer(state.user.id);
+      
+      peer.on('open', () => {
+        console.log('Peer connected with ID:', state.user.id);
+        
+        // Check if we should connect to a host
+        if (state.roomId && !state.roomId.startsWith('room-')) {
+          const hostId = state.roomId.replace('room-', 'user-');
+          connectToPeer(hostId);
+        }
+      });
+      
+      peer.on('connection', (conn) => {
+        conn.on('data', handleData);
+        connections.push(conn);
+      });
+      
+      peer.on('call', (call) => {
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+          .then(stream => {
+            call.answer(stream);
+            elements.userVideo.srcObject = stream;
+            
+            call.on('stream', (remoteStream) => {
+              addVideoStream(call.peer, remoteStream);
+            });
+          })
+          .catch(err => {
+            console.error('Failed to get media:', err);
+            alert('Could not access camera/microphone');
+          });
+      });
+    }
+
+    function getUserMedia() {
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+          elements.userVideo.srcObject = stream;
+          
+          // If we created the room, we're the host
+          if (state.roomId.startsWith('room-')) {
+            // No need to connect to anyone
+          } else {
+            // Try to connect to the room host
+            const hostId = state.roomId.replace('room-', 'user-');
+            connectToPeer(hostId);
+          }
+        })
+        .catch(err => {
+          console.error('Error getting media:', err);
+          alert('Could not access camera/microphone');
+        });
+    }
+
+    function connectToPeer(peerId) {
+      if (peerId === state.user.id) return; // Don't connect to ourselves
+      
+      const conn = peer.connect(peerId);
+      
+      conn.on('open', () => {
+        connections.push(conn);
+        conn.on('data', handleData);
+        
+        // Call the peer for video
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+          .then(stream => {
+            const call = peer.call(peerId, stream);
+            elements.userVideo.srcObject = stream;
+            
+            call.on('stream', (remoteStream) => {
+              addVideoStream(peerId, remoteStream);
+            });
+          })
+          .catch(err => {
+            console.error('Error getting media:', err);
+          });
+      });
+    }
+
+    function handleData(data) {
+      switch (data.type) {
+        case 'message':
+          addMessage(data.sender, data.text, data.timestamp);
+          break;
+        case 'timer':
+          setTimer(data.timeLeft, data.isRunning);
+          break;
+        case 'user-joined':
+          addParticipant(data.userId, data.userName);
+          break;
+      }
+    }
+
+    function addVideoStream(peerId, stream) {
+      // Check if video already exists
+      if (document.getElementById(peerId)) return;
+      
+      const video = document.createElement('video');
+      video.id = peerId;
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.style.width = '100%';
+      video.style.borderRadius = '8px';
+      video.style.aspectRatio = '16/9';
+      
+      elements.videoGrid.appendChild(video);
+      
+      // Add to participants list
+      addParticipant(peerId, `Peer ${peerId.slice(0, 4)}`);
+    }
+
+    function addParticipant(userId, userName) {
+      // Check if already added
+      if (document.getElementById(`participant-${userId}`)) return;
+      
+      const participant = document.createElement('div');
+      participant.className = 'user-card';
+      participant.id = `participant-${userId}`;
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = userName.charAt(0).toUpperCase();
+      
+      const name = document.createElement('div');
+      name.textContent = userName;
+      
+      participant.appendChild(avatar);
+      participant.appendChild(name);
+      elements.participantsList.appendChild(participant);
+      
+      updateParticipantCount();
+    }
+
+    function updateParticipantCount() {
+      const count = document.querySelectorAll('.user-card').length;
+      elements.participantCount.textContent = count;
+    }
+
+    function updateUserDisplay() {
+      elements.displayUserName.textContent = state.user.name;
+      elements.displayRoomId.textContent = state.roomId;
+      elements.displayFocusGoal.textContent = state.user.focusGoal || 'Not specified';
+      elements.userAvatar.textContent = state.user.name.charAt(0).toUpperCase();
+    }
+
+    function setTimer(seconds, shouldRun = false) {
+      clearInterval(state.timer.interval);
+      
+      state.timer.timeLeft = seconds;
+      updateTimerDisplay();
+      
+      if (shouldRun) {
+        startTimer();
+      } else {
+        state.timer.isRunning = false;
+        elements.timerToggle.textContent = 'Start Timer';
+      }
+    }
+
+    function startTimer() {
+      clearInterval(state.timer.interval);
+      
+      state.timer.isRunning = true;
+      elements.timerToggle.textContent = 'Pause Timer';
+      
+      state.timer.interval = setInterval(() => {
+        state.timer.timeLeft--;
+        updateTimerDisplay();
+        
+        if (state.timer.timeLeft <= 0) {
+          clearInterval(state.timer.interval);
+          state.timer.isRunning = false;
+          elements.timerToggle.textContent = 'Start Timer';
+          playTimerSound();
+          
+          // Track productive session
+          const minutes = Math.ceil((state.timer.initialTime - state.timer.timeLeft) / 60);
+          state.productivityData.focusedTime += minutes;
+          state.productivityData.sessions.push({
+            date: new Date().toISOString(),
+            minutes: minutes,
+            type: 'focused'
+          });
+          updateProductivityChart();
+        }
+      }, 1000);
+    }
+
+    function toggleTimer() {
+      if (state.timer.isRunning) {
+        clearInterval(state.timer.interval);
+        state.timer.isRunning = false;
+        elements.timerToggle.textContent = 'Start Timer';
+      } else {
+        startTimer();
+      }
+      
+      // Broadcast timer state to peers
+      broadcastData({
+        type: 'timer',
+        timeLeft: state.timer.timeLeft,
+        isRunning: state.timer.isRunning
+      });
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(state.timer.timeLeft / 60);
+      const seconds = state.timer.timeLeft % 60;
+      elements.timerDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+
+    function playTimerSound() {
+      const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3');
+      audio.play();
+    }
+
+    function sendMessage() {
+      const message = elements.chatInput.value.trim();
+      if (!message) return;
+      
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      addMessage(state.user.name, message, timestamp);
+      
+      // Broadcast to peers
+      broadcastData({
+        type: 'message',
+        sender: state.user.name,
+        text: message,
+        timestamp: timestamp
+      });
+      
+      elements.chatInput.value = '';
+    }
+
+    function addMessage(sender, text, timestamp) {
+      const messageDiv = document.createElement('div');
+      messageDiv.innerHTML = `
+        <strong>${sender}:</strong> ${text} 
+        <small style="color: #718096">${timestamp}</small>
+      `;
+      elements.chatMessages.appendChild(messageDiv);
+      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    }
+
+    function changeAmbientSound() {
+      state.ambientSound = elements.ambientSound.value;
+      
+      if (state.ambientSound) {
+        const sounds = {
+          cafe: 'https://assets.mixkit.co/sfx/preview/mixkit-busy-coffee-shop-759.mp3',
+          rain: 'https://assets.mixkit.co/sfx/preview/mixkit-rain-ambient-1141.mp3',
+          fireplace: 'https://assets.mixkit.co/sfx/preview/mixkit-crackling-fireplace-1190.mp3'
+        };
+        
+        elements.ambientAudio.src = sounds[state.ambientSound];
+        elements.ambientAudio.play().catch(e => console.log('Audio play failed:', e));
+      } else {
+        elements.ambientAudio.pause();
+      }
+    }
+
+    function broadcastData(data) {
+      connections.forEach(conn => {
+        conn.send(data);
+      });
+    }
+
+    function leaveRoom() {
+      // Stop all media streams
+      if (elements.userVideo.srcObject) {
+        elements.userVideo.srcObject.getTracks().forEach(track => track.stop());
+      }
+      
+      // Clear timer
+      clearInterval(state.timer.interval);
+      
+      // Close all peer connections
+      connections.forEach(conn => conn.close());
+      if (peer) peer.destroy();
+      
+      // Remove all peer videos
+      document.querySelectorAll('video:not(#userVideo)').forEach(video => video.remove());
+      
+      // Clear participants list except self
+      document.querySelectorAll('.user-card:not(:first-child)').forEach(el => el.remove());
+      updateParticipantCount();
+      
+      // Reset state
+      state.peers = [];
+      state.messages = [];
+      state.timer = {
+        timeLeft: 1500,
+        isRunning: false,
+        interval: null
+      };
+      
+      // Update UI
+      elements.lobby.classList.remove('hidden');
+      elements.room.classList.add('hidden');
+      elements.chatMessages.innerHTML = '';
+      elements.timerDisplay.textContent = '25:00';
+      elements.timerToggle.textContent = 'Start Timer';
+      elements.ambientSound.value = '';
+      elements.ambientAudio.pause();
+      
+      window.history.pushState({}, '', '/');
+    }
+
+    function initProductivityChart() {
+      state.productivityChart = new Chart(elements.productivityChart, {
+        type: 'doughnut',
+        data: {
+          labels: ['Focused', 'Distracted'],
+          datasets: [{
+            data: [state.productivityData.focusedTime, state.productivityData.distractedTime],
+            backgroundColor: ['#4299e1', '#e53e3e']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          }
+        }
+      });
+    }
+
+    function updateProductivityChart() {
+      state.productivityChart.data.datasets[0].data = [
+        state.productivityData.focusedTime,
+        state.productivityData.distractedTime
+      ];
+      state.productivityChart.update();
+    }
+
+    // Initialize the app when the page loads
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
